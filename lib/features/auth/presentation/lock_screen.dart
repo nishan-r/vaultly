@@ -34,6 +34,8 @@ class _LockScreenState extends ConsumerState<LockScreen>
   bool _isAuthenticating = false;
   String? _statusMessage;
   bool _isSuccess = false;
+  bool _showPinField = false;
+  String? _pinError;
 
   // Animation for the status message fade-in
   late AnimationController _statusAnimController;
@@ -80,17 +82,26 @@ class _LockScreenState extends ConsumerState<LockScreen>
       if (mounted) _pulseInnerController.repeat(reverse: true);
     });
 
-    // Auto-trigger biometric on first load.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _authenticateWithBiometrics();
-    });
+    // PIN input controllers
+    _pinControllers = List.generate(4, (_) => TextEditingController());
+    _pinFocusNodes = List.generate(4, (_) => FocusNode());
   }
+
+  // PIN input
+  late List<TextEditingController> _pinControllers;
+  late List<FocusNode> _pinFocusNodes;
 
   @override
   void dispose() {
     _pulseOuterController.dispose();
     _pulseInnerController.dispose();
     _statusAnimController.dispose();
+    for (final c in _pinControllers) {
+      c.dispose();
+    }
+    for (final f in _pinFocusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -161,6 +172,7 @@ class _LockScreenState extends ConsumerState<LockScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Padding(
@@ -338,13 +350,24 @@ class _LockScreenState extends ConsumerState<LockScreen>
     );
   }
 
-  // ── "Use PIN" button ──────────────────────────────────────────────────
+  // ── "Use PIN" button / inline PIN field ────────────────────────────────
   Widget _buildUsePinButton() {
+    if (_showPinField) {
+      return _buildPinFields();
+    }
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton.icon(
-        onPressed: _isAuthenticating ? null : _authenticateWithBiometrics,
+        onPressed: _isAuthenticating
+            ? null
+            : () {
+                setState(() => _showPinField = true);
+                // Auto-focus the first PIN field after the frame renders
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _pinFocusNodes[0].requestFocus();
+                });
+              },
         icon: const Icon(Icons.keyboard_outlined, size: 20),
         label: Text('Use PIN', style: AppTextStyles.buttonPrimary),
         style: ElevatedButton.styleFrom(
@@ -358,6 +381,115 @@ class _LockScreenState extends ConsumerState<LockScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildPinFields() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(4, (index) {
+            return Container(
+              width: 56,
+              height: 64,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              child: TextField(
+                controller: _pinControllers[index],
+                focusNode: _pinFocusNodes[index],
+                obscureText: true,
+                obscuringCharacter: '●',
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                style: AppTextStyles.heading1.copyWith(fontSize: 24),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: _pinError != null
+                      ? AppColors.error.withValues(alpha: 0.05)
+                      : AppColors.lavenderOuter,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _pinError != null
+                          ? AppColors.error
+                          : AppColors.lavenderMid,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _pinError != null
+                          ? AppColors.error
+                          : AppColors.lavenderMid,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _pinError != null
+                          ? AppColors.error
+                          : AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onChanged: (value) {
+                  if (_pinError != null) {
+                    setState(() => _pinError = null);
+                  }
+                  if (value.length == 1 && index < 3) {
+                    _pinFocusNodes[index + 1].requestFocus();
+                  } else if (value.isEmpty && index > 0) {
+                    _pinFocusNodes[index - 1].requestFocus();
+                  }
+                  // Auto-submit when all 4 digits entered
+                  final pin = _pinControllers.map((c) => c.text).join();
+                  if (pin.length == 4) {
+                    _validatePin(pin);
+                  }
+                },
+              ),
+            );
+          }),
+        ),
+        if (_pinError != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _pinError!,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _validatePin(String pin) {
+    // TODO: Replace with actual stored PIN check from Hive
+    const storedPin = '1234';
+
+    if (pin == storedPin) {
+      _showStatus('Authenticated. Access granted.', success: true);
+      HapticFeedback.lightImpact();
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          ref.read(authStateProvider.notifier).unlock();
+        }
+      });
+    } else {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _pinError = 'Incorrect PIN. Try again.';
+      });
+      for (final c in _pinControllers) {
+        c.clear();
+      }
+      _pinFocusNodes[0].requestFocus();
+    }
   }
 
   // ── "Forgot authentication?" link ─────────────────────────────────────

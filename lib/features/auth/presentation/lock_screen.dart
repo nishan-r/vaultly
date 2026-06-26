@@ -35,7 +35,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
   String? _statusMessage;
   bool _isSuccess = false;
   bool _showPinField = false;
-  String? _pinError;
 
   // Animation for the status message fade-in
   late AnimationController _statusAnimController;
@@ -82,26 +81,13 @@ class _LockScreenState extends ConsumerState<LockScreen>
       if (mounted) _pulseInnerController.repeat(reverse: true);
     });
 
-    // PIN input controllers
-    _pinControllers = List.generate(4, (_) => TextEditingController());
-    _pinFocusNodes = List.generate(4, (_) => FocusNode());
   }
-
-  // PIN input
-  late List<TextEditingController> _pinControllers;
-  late List<FocusNode> _pinFocusNodes;
 
   @override
   void dispose() {
     _pulseOuterController.dispose();
     _pulseInnerController.dispose();
     _statusAnimController.dispose();
-    for (final c in _pinControllers) {
-      c.dispose();
-    }
-    for (final f in _pinFocusNodes) {
-      f.dispose();
-    }
     super.dispose();
   }
 
@@ -353,7 +339,9 @@ class _LockScreenState extends ConsumerState<LockScreen>
   // ── "Use PIN" button / inline PIN field ────────────────────────────────
   Widget _buildUsePinButton() {
     if (_showPinField) {
-      return _buildPinFields();
+      return _PinInputWidget(
+        onSuccess: _handlePinSuccess,
+      );
     }
     return SizedBox(
       width: double.infinity,
@@ -363,10 +351,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
             ? null
             : () {
                 setState(() => _showPinField = true);
-                // Auto-focus the first PIN field after the frame renders
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _pinFocusNodes[0].requestFocus();
-                });
               },
         icon: const Icon(Icons.keyboard_outlined, size: 20),
         label: Text('Use PIN', style: AppTextStyles.buttonPrimary),
@@ -383,7 +367,95 @@ class _LockScreenState extends ConsumerState<LockScreen>
     );
   }
 
-  Widget _buildPinFields() {
+  void _handlePinSuccess() {
+    _showStatus('Authenticated. Access granted.', success: true);
+    HapticFeedback.lightImpact();
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        ref.read(authStateProvider.notifier).unlock();
+      }
+    });
+  }
+
+  // ── "Forgot authentication?" link ─────────────────────────────────────
+  Widget _buildForgotLink() {
+    return TextButton(
+      onPressed: () {
+        // Placeholder – future: forgot authentication flow
+      },
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      child: Text('Forgot authentication?', style: AppTextStyles.linkText),
+    );
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  Widget _buildFooter() {
+    return Text(
+      'Vaultly v4.2.0 • Secured by Precision FinTech',
+      style: AppTextStyles.footer,
+      textAlign: TextAlign.center,
+    );
+  }
+}
+
+class _PinInputWidget extends StatefulWidget {
+  final VoidCallback onSuccess;
+
+  const _PinInputWidget({required this.onSuccess});
+
+  @override
+  State<_PinInputWidget> createState() => _PinInputWidgetState();
+}
+
+class _PinInputWidgetState extends State<_PinInputWidget> {
+  late List<TextEditingController> _pinControllers;
+  late List<FocusNode> _pinFocusNodes;
+  String? _pinError;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinControllers = List.generate(4, (_) => TextEditingController());
+    _pinFocusNodes = List.generate(4, (_) => FocusNode());
+    // Auto-focus the first PIN field after the frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pinFocusNodes[0].requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final c in _pinControllers) {
+      c.dispose();
+    }
+    for (final f in _pinFocusNodes) {
+      f.dispose();
+    }
+    super.dispose();
+  }
+
+  void _validatePin(String pin) {
+    // TODO: Replace with actual stored PIN check from Hive
+    const storedPin = '1234';
+
+    if (pin == storedPin) {
+      widget.onSuccess();
+    } else {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _pinError = 'Incorrect PIN. Try again.';
+      });
+      for (final c in _pinControllers) {
+        c.clear();
+      }
+      _pinFocusNodes[0].requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -465,52 +537,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
           ),
         ],
       ],
-    );
-  }
-
-  void _validatePin(String pin) {
-    // TODO: Replace with actual stored PIN check from Hive
-    const storedPin = '1234';
-
-    if (pin == storedPin) {
-      _showStatus('Authenticated. Access granted.', success: true);
-      HapticFeedback.lightImpact();
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          ref.read(authStateProvider.notifier).unlock();
-        }
-      });
-    } else {
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _pinError = 'Incorrect PIN. Try again.';
-      });
-      for (final c in _pinControllers) {
-        c.clear();
-      }
-      _pinFocusNodes[0].requestFocus();
-    }
-  }
-
-  // ── "Forgot authentication?" link ─────────────────────────────────────
-  Widget _buildForgotLink() {
-    return TextButton(
-      onPressed: () {
-        // Placeholder – future: forgot authentication flow
-      },
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      ),
-      child: Text('Forgot authentication?', style: AppTextStyles.linkText),
-    );
-  }
-
-  // ── Footer ────────────────────────────────────────────────────────────
-  Widget _buildFooter() {
-    return Text(
-      'Vaultly v4.2.0 • Secured by Precision FinTech',
-      style: AppTextStyles.footer,
-      textAlign: TextAlign.center,
     );
   }
 }

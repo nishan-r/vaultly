@@ -8,7 +8,7 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(child: VaultlyApp()),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     // The lock screen should show the heading.
     expect(find.text('Unlock to continue'), findsOneWidget);

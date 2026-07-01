@@ -45,6 +45,7 @@ class _LockScreenState extends ConsumerState<LockScreen>
   late Animation<double> _pulseOuterAnim;
   late AnimationController _pulseInnerController;
   late Animation<double> _pulseInnerAnim;
+  Timer? _staggerTimer;
 
   @override
   void initState() {
@@ -77,14 +78,14 @@ class _LockScreenState extends ConsumerState<LockScreen>
       CurvedAnimation(parent: _pulseInnerController, curve: Curves.easeInOut),
     );
     // Stagger the inner ring by 400ms
-    Future.delayed(const Duration(milliseconds: 400), () {
+    _staggerTimer = Timer(const Duration(milliseconds: 400), () {
       if (mounted) _pulseInnerController.repeat(reverse: true);
     });
-
   }
 
   @override
   void dispose() {
+    _staggerTimer?.cancel();
     _pulseOuterController.dispose();
     _pulseInnerController.dispose();
     _statusAnimController.dispose();

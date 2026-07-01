@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_colors.dart';
+
+String? _getBrandIcon(String nameOrUrl) {
+  final clean = nameOrUrl.toLowerCase();
+  if (clean.contains('google')) return 'assets/icons/google.svg';
+  if (clean.contains('facebook') || clean == 'fb') return 'assets/icons/facebook.svg';
+  if (clean.contains('instagram')) return 'assets/icons/instagram.svg';
+  if (clean.contains('amazon')) return 'assets/icons/amazon.svg';
+  if (clean.contains('spotify')) return 'assets/icons/spotify.svg';
+  if (clean.contains('github')) return 'assets/icons/github.svg';
+  if (clean.contains('twitter') || clean == 'x' || clean.contains('x.com')) return 'assets/icons/x.svg';
+  return null;
+}
 
 class VaultScreen extends StatelessWidget {
   const VaultScreen({super.key});
@@ -89,9 +102,9 @@ class VaultScreen extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: const [
                     _FavoriteItem(title: 'Google', initial: 'G', color: Colors.blue),
+                    _FavoriteItem(title: 'Instagram', initial: 'I', color: Colors.pink),
                     _FavoriteItem(title: 'Facebook', initial: 'f', color: Color(0xFF1877F2)),
                     _FavoriteItem(title: 'Amazon', initial: 'a', color: Colors.orange),
-                    _FavoriteItem(title: 'Netflix', initial: 'N', color: Colors.red),
                     _FavoriteItem(title: 'Spotify', initial: 'S', color: Color(0xFF1DB954)),
                   ],
                 ),
@@ -135,6 +148,14 @@ class VaultScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const _AccountItem(
+                title: 'Instagram',
+                url: 'instagram.com',
+                count: 1,
+                initial: 'I',
+                color: Colors.pink,
+              ),
+              const SizedBox(height: 12),
+              const _AccountItem(
                 title: 'Facebook',
                 url: 'facebook.com',
                 count: 1,
@@ -148,14 +169,6 @@ class VaultScreen extends StatelessWidget {
                 count: 3,
                 initial: 'G',
                 color: Colors.black,
-              ),
-              const SizedBox(height: 12),
-              const _AccountItem(
-                title: 'Adobe Creative Cloud',
-                url: 'adobe.com',
-                count: 1,
-                initial: 'A',
-                color: Colors.redAccent,
               ),
               const SizedBox(height: 12),
               const _AccountItem(
@@ -203,6 +216,7 @@ class _FavoriteItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconPath = _getBrandIcon(title);
     return Padding(
       padding: const EdgeInsets.only(right: 16.0),
       child: Column(
@@ -222,24 +236,32 @@ class _FavoriteItem extends StatelessWidget {
               ],
             ),
             child: Center(
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+              child: iconPath != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: SvgPicture.asset(
+                        iconPath,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -274,6 +296,7 @@ class _AccountItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconPath = _getBrandIcon(title) ?? _getBrandIcon(url);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -296,18 +319,31 @@ class _AccountItem extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: iconPath != null ? const Color(0xFFF8F9FA) : color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
+              border: iconPath != null
+                  ? Border.all(
+                      color: AppColors.border.withValues(alpha: 0.2),
+                    )
+                  : null,
             ),
             child: Center(
-              child: Text(
-                initial,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: iconPath != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SvgPicture.asset(
+                        iconPath,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : Text(
+                      initial,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 16),
